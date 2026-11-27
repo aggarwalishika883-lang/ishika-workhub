@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ishika WorkHub — Your Personal Command Centre</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root { --bg:#f4f6fb; --surface:#ffffff; --text:#1e293b; --muted:#64748b; --border:#e2e8f0; --accent:#7c3aed; --high:#e11d48; --medium:#d97706; --low:#059669; --shadow:0 1px 3px rgba(15,23,42,.08),0 4px 14px rgba(15,23,42,.05); }
+  body[data-view="workspaces"] { --accent:#9333ea; }
+  body[data-view="news"] { --accent:#a855f7; }
+  body[data-view="assistant"] { --accent:#6d28d9; }
+  body[data-view="suggestions"] { --accent:#8b5cf6; }
+  body[data-view="calendar"] { --accent:#7e22ce; }
+  body[data-view="reports"] { --accent:#a21caf; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0b1220; --surface:#162032; --text:#e2e8f0; --muted:#94a3b8; --border:#2a3a52; --shadow:none; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); padding:env(safe-area-inset-top,0px) 16px env(safe-area-inset-bottom,0px); }
+  .container { max-width:1000px; margin:0 auto 40px; }
+  .app-header { background:linear-gradient(120deg,var(--accent),#3b0764); color:#fff; border-radius:16px; padding:22px 26px; margin:24px 0 16px; box-shadow:var(--shadow); }
+  .app-title { font-size:1.6rem; font-weight:700; letter-spacing:-0.01em; }
+  .app-sub { opacity:.85; font-size:.92rem; margin-top:4px; }
+  h2 { margin:0 0 10px; font-size:1.05rem; font-weight:700; }
+  .card { background:var(--surface); border:1px solid var(--border); border-top:3px solid var(--accent); border-radius:14px; padding:18px; margin-bottom:16px; box-shadow:var(--shadow); }
+  input, select, button, textarea { font:inherit; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
+  textarea { width:100%; resize:vertical; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  button { cursor:pointer; background:var(--accent); color:#fff; border:none; font-weight:600; }
+  button:hover { filter:brightness(1.07); }
+  button.secondary { background:var(--surface); color:var(--text); border:1px solid var(--border); font-weight:500; }
+  button.danger { background:var(--surface); color:var(--high); border:1px solid var(--border); font-weight:500; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > input[type="search"], .row > input[type="text"] { flex:1; min-width:160px; }
+  .grid-add { display:grid; gap:8px; grid-template-columns:1fr; }
+  @media (min-width:600px) { .grid-add { grid-template-columns:2fr 1fr 1fr auto; } }
+  .tabs { display:inline-flex; flex-wrap:wrap; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:18px; box-shadow:var(--shadow); }
+  .tab { background:transparent; color:var(--muted); border:none; padding:8px 14px; border-radius:9px; font-weight:600; }
+  .tab:hover { background:var(--bg); filter:none; }
+  .tab.active { background:var(--accent); color:#fff; }
+  .muted { color:var(--muted); font-size:.9rem; }
+  .filters .active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+  .stat { background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:12px; padding:14px; box-shadow:var(--shadow); }
+  .stat .num { font-size:1.6rem; font-weight:700; } .stat .lbl { color:var(--muted); font-size:.85rem; }
+  .stat.warn { border-left-color:var(--high); } .stat.warn .num { color:var(--high); }
+  .wsrow { margin-bottom:12px; } .wsline { display:flex; justify-content:space-between; margin-bottom:4px; }
+  .bar { height:8px; background:var(--border); border-radius:99px; overflow:hidden; } .bar > div { height:100%; background:var(--accent); }
+  .prow { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); } .prow:last-child { border-bottom:none; }
+  ul.tasks { list-style:none; padding:0; margin:0; }
+  li.task { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--border); } li.task:last-child { border-bottom:none; }
+  li.task input[type="checkbox"] { margin-top:4px; width:18px; height:18px; flex-shrink:0; accent-color:var(--accent); }
+  .task-body { flex:1; min-width:0; } .task-title { font-weight:600; word-break:break-word; } .task-title a { color:inherit; }
+  li.task.done .task-title { text-decoration:line-through; color:var(--muted); }
+  .meta { display:flex; gap:8px; flex-wrap:wrap; font-size:.8rem; color:var(--muted); margin-top:4px; }
+  .badge { padding:2px 9px; border-radius:999px; border:1px solid currentColor; font-weight:600; text-transform:capitalize; font-size:.78rem; }
+  .badge.high { color:var(--high); } .badge.medium { color:var(--medium); } .badge.low { color:var(--low); }
+  .overdue { color:var(--high); font-weight:600; }
+  .actions { display:flex; gap:6px; flex-shrink:0; } .actions button { padding:6px 10px; font-size:.85rem; }
+  .edit-row { display:grid; gap:8px; grid-template-columns:1fr; width:100%; }
+  @media (min-width:600px) { .edit-row { grid-template-columns:2fr 1fr 1fr auto auto; } }
+  .empty { text-align:center; color:var(--muted); padding:24px 0; }
+  .ai-out { white-space:pre-wrap; min-height:60px; line-height:1.6; }
+  .ai-buttons { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .news-cols { display:grid; grid-template-columns:1fr; gap:12px; }
+  @media (min-width:700px) { .news-cols { grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); } }
+  .news-col { background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; }
+  .news-col-head { display:flex; justify-content:space-between; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+  .news-item { padding:8px 0; border-bottom:1px solid var(--border); } .news-item:last-child { border-bottom:none; }
+  .hot-col { border:2px solid var(--high); }
+  .hero-mini{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.brand-mark{font-size:1.05rem;font-weight:800;letter-spacing:.04em}.section-intro{color:var(--muted);margin:0 0 14px;line-height:1.5}.chat-log{height:340px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg);display:flex;flex-direction:column;gap:10px}.bubble{max-width:88%;padding:10px 13px;border-radius:14px;white-space:pre-wrap;line-height:1.5}.bubble.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--border)}.bubble.user{align-self:flex-end;background:var(--accent);color:white}.social-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.social-post{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg)}.social-post p{white-space:pre-wrap}.pill{font-size:.75rem;border:1px solid var(--border);border-radius:99px;padding:3px 8px;color:var(--muted)}.notice{background:rgba(124,58,237,.08);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--muted);font-size:.88rem}.full{width:100%}
+  .news-item.hot { background:rgba(225,29,72,.08); border-left:4px solid var(--high); padding-left:8px; border-radius:6px; }
+
+
+  .news-calendar-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.news-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin-top:16px}.news-day-name{text-align:center;color:var(--muted);font-size:.78rem;font-weight:700;padding:6px}.news-day{position:relative;min-height:42px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);padding:8px 4px;font-weight:600}.news-day.muted-day{opacity:.35}.news-day.selected{background:#6257e8;color:#fff;border-color:#6257e8}.news-day.has-news:after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#16a34a;bottom:5px;left:calc(50% - 2px)}.news-day.selected.has-news:after{background:#fff}.news-category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:15px}.news-category-link{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px;border:1px solid var(--border);border-radius:11px;background:var(--bg);color:var(--text);text-decoration:none;font-weight:600}.news-category-link:hover{border-color:#6257e8;background:#f5f4ff}.news-category-link span:last-child{color:var(--muted)}
+
+/* WorkHub visual refresh */
+:root{--bg:#f3f5fa;--surface:#fff;--text:#172033;--muted:#718096;--border:#e7eaf1;--accent:#6257e8;--shadow:0 8px 28px rgba(31,41,75,.055)}
+body{padding:0 22px 40px;background:radial-gradient(circle at 80% -10%,#e9e7ff 0,transparent 32%),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.container{max-width:1480px;margin:0 auto 40px}.app-header{margin:22px 0 18px;padding:28px 32px;border-radius:22px;background:linear-gradient(115deg,#171d3b 0%,#393879 56%,#6a5be8 100%);box-shadow:0 16px 40px rgba(44,42,107,.18)}.brand-mark{font-size:.76rem;letter-spacing:.18em;color:#c9c8ff}.app-title{font-size:clamp(1.55rem,3vw,2.2rem);letter-spacing:-.04em;margin-top:8px}.app-sub{font-size:.98rem;color:#e1e2ff}.workspace-shell{display:grid;grid-template-columns:226px minmax(0,1fr);gap:22px;align-items:start}.tabs{display:flex;flex-direction:column;align-items:stretch;gap:5px;position:sticky;top:16px;padding:12px;margin:0;border:1px solid var(--border);border-radius:18px;background:rgba(255,255,255,.88);box-shadow:var(--shadow)}.tab{text-align:left;padding:12px 14px;border-radius:11px;color:#667085;font-size:.92rem}.tab:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#c5c9d6;margin:0 12px 1px 1px}.tab.active{background:#efeeff;color:#4f46c8}.tab.active:before{background:#6257e8}.tab:hover{background:#f5f5ff}.workspace-shell>section{min-width:0}.card{border:1px solid var(--border);border-top:0;border-radius:17px;padding:22px;margin-bottom:17px;box-shadow:var(--shadow)}h2{font-size:1.08rem;letter-spacing:-.02em}.stats-grid{gap:14px}.stat{border:1px solid var(--border);border-left:0;border-radius:16px;padding:18px;box-shadow:var(--shadow)}.stat .num{font-size:1.9rem;letter-spacing:-.04em}.stat .lbl{font-size:.82rem}.tabs button:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #aaa5ff;outline-offset:2px}.notice{background:#f5f4ff;border-color:#e5e2ff;color:#5e5b82}.page-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:4px 0 18px}.page-heading h1{font-size:1.85rem;letter-spacing:-.045em;margin:5px 0}.eyebrow{font-size:.7rem;letter-spacing:.16em;font-weight:800;color:#7168d8}.primary-link{display:inline-flex;padding:11px 15px;border-radius:10px;background:#6257e8;color:white;text-decoration:none;font-weight:700;font-size:.88rem}.blog-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}.blog-toolbar input{max-width:430px;width:100%;background:white}.blog-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.blog-card{background:white;border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:190px;transition:transform .18s,box-shadow .18s}.blog-card:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(31,41,75,.09)}.blog-card[hidden]{display:none}.blog-card-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.blog-category{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800;color:#6257d9;background:#f0efff;padding:5px 8px;border-radius:99px}.blog-date{font-size:.75rem;color:#8790a3}.blog-card h3{font-size:1rem;line-height:1.35;margin:15px 0 7px;letter-spacing:-.02em}.blog-card p{font-size:.87rem;color:#758096;line-height:1.5;margin:0 0 18px}.blog-actions{display:flex;gap:14px;align-items:center;margin-top:auto}.blog-actions a{font-size:.82rem;font-weight:750;color:#5a51d5;text-decoration:none}.blog-actions .edit-blog{color:#7d8798;font-weight:600}.chat-log{background:#f8f9fd;border:1px solid var(--border)}.social-post{background:#fafaff;border-color:var(--border)}button{border-radius:10px}input,select,textarea{border-radius:10px;background:#fbfcff;border-color:#e4e7ef}
+@media(max-width:1000px){.blog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){body{padding:0 12px 28px}.app-header{margin:12px 0;padding:22px;border-radius:17px}.workspace-shell{grid-template-columns:1fr;gap:14px}.tabs{position:relative;top:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:8px}.tab{padding:10px 8px;font-size:.82rem}.tab:before{margin-right:7px}.blog-grid{grid-template-columns:1fr}.page-heading{align-items:flex-start;flex-direction:column}.blog-toolbar{align-items:stretch;flex-direction:column}.blog-toolbar input{max-width:none}.card{padding:17px}}
+@media print{.tabs,.app-header,.blog-toolbar,.primary-link{display:none!important}.workspace-shell{display:block}.blog-grid{grid-template-columns:repeat(2,1fr)}}
+
+
+/* ---------- unified WorkHub experience ---------- */
+:root{--bg:#f5f6fb;--surface:#fff;--text:#20243a;--muted:#747b91;--border:#e8eaf2;--accent:#6558df;--shadow:0 10px 34px rgba(34,38,75,.055)}
+body{color:var(--text);background:linear-gradient(145deg,#f7f7fc 0%,#f0f2fa 58%,#f8f7ff 100%);font-size:14px;line-height:1.5}
+.container{max-width:1540px}
+.app-header{position:relative;overflow:hidden;border-radius:24px;padding:30px 34px;background:linear-gradient(112deg,#171b35 0%,#292d59 52%,#665be1 100%);box-shadow:0 18px 48px rgba(39,39,95,.17)}
+.app-header:after{content:"";position:absolute;width:330px;height:330px;border:1px solid rgba(255,255,255,.13);border-radius:50%;right:7%;top:-230px;box-shadow:0 0 0 35px rgba(255,255,255,.035),0 0 0 75px rgba(255,255,255,.025)}
+.app-header .hero-mini{position:relative;z-index:1}.brand-mark{font-size:.7rem;letter-spacing:.2em;color:#c9c7ff}.app-title{font-size:clamp(1.7rem,3vw,2.45rem);font-weight:780;letter-spacing:-.055em}.app-sub{font-size:.95rem;color:#d9d9f4}
+.utility-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:0 4px 18px}.utility-greeting,.utility-actions{display:flex;align-items:center;gap:10px}.utility-greeting{font-weight:650;color:#454b65}.live-dot{width:8px;height:8px;border-radius:50%;background:#20b981;box-shadow:0 0 0 4px #20b9811c}.utility-separator{color:#c0c3d0}.utility-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;background:#fff;color:#515873;border:1px solid var(--border);border-radius:10px;font-size:.82rem;font-weight:650;box-shadow:0 2px 8px rgba(30,35,70,.035)}.utility-btn:hover{background:#f4f3ff;color:#5145c9;filter:none}
+.workspace-shell{grid-template-columns:238px minmax(0,1fr);gap:24px}.tabs{top:18px;padding:11px;border-radius:18px;background:rgba(255,255,255,.9);backdrop-filter:blur(12px);box-shadow:0 8px 26px rgba(34,38,75,.045)}.tab{position:relative;text-align:left;padding:12px 13px;border-radius:11px;font-size:.88rem;font-weight:650;color:#70778d;transition:background .16s,color .16s,transform .16s}.tab:before{width:7px;height:7px;margin-right:12px}.tab.active{background:#eeedff;color:#5146c8}.tab.active:after{content:"";position:absolute;right:9px;top:calc(50% - 10px);height:20px;width:3px;border-radius:5px;background:#6558df}.tab:hover{transform:translateX(2px);background:#f5f4ff}
+.card{border-radius:18px;padding:22px;background:var(--surface);border:1px solid var(--border);box-shadow:0 8px 28px rgba(35,40,78,.045);margin-bottom:16px}.card h2{font-size:1.02rem;font-weight:750;color:#292e48}.page-heading{margin:3px 0 20px}.page-heading h1{font-size:2rem;color:#252a45}.eyebrow{color:#7167d5;font-size:.68rem;letter-spacing:.17em}.section-intro{font-size:.9rem;color:#7a8196}
+.stats-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px}.stat{position:relative;overflow:hidden;border:1px solid var(--border);border-radius:16px;background:#fff;padding:18px 19px;box-shadow:0 7px 22px rgba(36,40,75,.04)}.stat:after{content:"";position:absolute;right:-18px;top:-23px;width:75px;height:75px;border-radius:50%;background:#6558df0b}.stat .num{font-size:2rem;color:#292e4b}.stat .lbl{font-weight:600;color:#81879a}.stat.warn .num{color:#d04462}
+button{transition:filter .15s,transform .15s,box-shadow .15s}button:not(.tab):active{transform:translateY(1px)}button:not(.secondary):not(.danger){box-shadow:0 3px 9px rgba(78,67,190,.13)}input,select,textarea{background:#fbfbfe;border-color:#e5e7f0;color:#30354d}input::placeholder,textarea::placeholder{color:#a0a5b5}input:focus,select:focus,textarea:focus{outline:3px solid #6558df25;border-color:#8b82e8}
+.news-day{min-height:46px;background:#fbfbfe;border-radius:12px}.news-day.selected{background:#6257e8}.news-day.has-news:after{width:6px;height:6px}.news-category-link{background:#fbfbfe;transition:border .15s,transform .15s,background .15s}.news-category-link:hover{transform:translateY(-2px);background:#f4f2ff}.news-col{background:#fbfbfe;border-radius:14px}.news-item{padding:10px 7px}.news-item .task-title{line-height:1.45}.news-chips button{font-size:.8rem}
+.blog-card{border-radius:17px;border-color:#e8eaf2;box-shadow:0 6px 20px rgba(34,38,75,.04)}.blog-card h3{color:#292e49}.blog-category{background:#f0efff;color:#5c52cf}.social-post{border-radius:15px;background:#fbfbfe}.chat-log{border-radius:15px}.bubble.bot{border-radius:14px 14px 14px 4px}.bubble.user{border-radius:14px 14px 4px 14px}.notice{border-radius:13px;background:#f4f3ff;color:#656b85;border-color:#e6e3ff}
+.app-footer{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:22px 4px 8px;color:#9398aa;font-size:.75rem}.app-footer span:first-child{font-weight:800;letter-spacing:.14em;color:#7169c7}
+body[data-theme="dark"]{--bg:#111525;--surface:#1a2033;--text:#edf0fb;--muted:#a1a8bd;--border:#30384f;--accent:#9b91ff;--shadow:none;background:#111525;color:var(--text)}body[data-theme="dark"] .tabs,body[data-theme="dark"] .card,body[data-theme="dark"] .stat,body[data-theme="dark"] .blog-card{background:#1a2033;border-color:#30384f}body[data-theme="dark"] .tab{color:#b3bad0}body[data-theme="dark"] .tab.active{background:#302d58;color:#dcd9ff}body[data-theme="dark"] .card h2,body[data-theme="dark"] .page-heading h1,body[data-theme="dark"] .blog-card h3,body[data-theme="dark"] .stat .num{color:#edf0fb}body[data-theme="dark"] input,body[data-theme="dark"] select,body[data-theme="dark"] textarea,body[data-theme="dark"] .news-day,body[data-theme="dark"] .news-category-link,body[data-theme="dark"] .news-col,body[data-theme="dark"] .social-post,body[data-theme="dark"] .chat-log{background:#141a2b;color:#edf0fb;border-color:#30384f}body[data-theme="dark"] .utility-btn{background:#1a2033;color:#e6e8f5;border-color:#30384f}body[data-theme="dark"] .notice{background:#252342;border-color:#39345f;color:#c4c5e0}body[data-theme="dark"] .news-category-link:hover{background:#292546}
+@media(max-width:760px){body{padding:0 12px 24px}.app-header{padding:22px 20px;margin:12px 0 14px}.utility-bar{align-items:flex-start;flex-direction:column;padding-bottom:14px}.workspace-shell{grid-template-columns:1fr;gap:12px}.tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));position:relative;top:auto;gap:5px}.tab{padding:10px 9px;font-size:.8rem}.tab:before{margin-right:8px}.tab.active:after{right:6px}.card{padding:16px}.app-footer{flex-wrap:wrap}.news-calendar{gap:4px}.news-day{min-height:39px;padding:6px 2px}}
+@media(max-width:420px){.utility-actions{width:100%}.utility-btn{flex:1;justify-content:center}.utility-greeting{font-size:.8rem}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stat .num{font-size:1.6rem}.news-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{.utility-bar,.app-footer{display:none!important}}
+
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="app-header"><div class="hero-mini"><div><div class="brand-mark">WORKHUB ✦</div><div class="app-title">Your smart work command centre</div><div class="app-sub">Tasks, insights, conversations and content — all in one place</div></div><span class="pill" style="color:white;border-color:#ffffff80">PERSONAL WORKSPACE</span></div></header>
+  <div class="utility-bar" role="toolbar" aria-label="Workspace tools">
+    <div class="utility-greeting"><span class="live-dot"></span><span id="todayLabel">Your workspace</span><span class="utility-separator">·</span><span class="muted">Everything in one place</span></div>
+    <div class="utility-actions"><button type="button" class="utility-btn" id="themeToggle" aria-label="Toggle colour theme">☾ <span>Theme</span></button><button type="button" class="utility-btn" id="exportBackup">↓ <span>Export backup</span></button></div>
+  </div>
+<div class="workspace-shell">
+  <nav class="tabs">
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="chatbot">Chatbot</button>
+    <button class="tab" data-tab="workspaces">Workspaces</button>
+    <button class="tab" data-tab="news">News</button>
+    <button class="tab" data-tab="blogs">My Blogs</button>
+    <button class="tab" data-tab="social">Social Media</button>
+    <button class="tab" data-tab="calendar">Calendar</button>
+    <button class="tab" data-tab="reports">Reports</button>
+    <button class="tab" data-tab="assistant">AI Assistant</button>
+    <button class="tab" data-tab="suggestions">Suggestions</button>
+  </nav>
+
+  <section id="view-dashboard"></section>
+
+  <section id="view-chatbot" hidden>
+    <div class="card"><h2>WorkHub chatbot</h2><p class="section-intro">Ask about your tasks, deadlines, reports, news or how to use this workspace.</p>
+      <div class="chat-log" id="chatLog" aria-live="polite"><div class="bubble bot">Hi! I’m your WorkHub chatbot. Ask me about your tasks, upcoming deadlines, progress or ideas.</div></div>
+      <div class="row" style="margin-top:12px"><input id="chatInput" class="full" type="text" maxlength="600" placeholder="Type a message…" aria-label="Chat message"><button id="chatSend" type="button">Send</button></div>
+      <div class="row" style="margin-top:9px"><button type="button" class="secondary" data-chat="What tasks are overdue?">Overdue tasks</button><button type="button" class="secondary" data-chat="Summarise my progress">My progress</button><button type="button" class="secondary" data-chat="What should I focus on today?">Focus today</button></div>
+    </div>
+    <div class="notice">The chatbot can answer using your saved workspace data. Generative AI replies use the connected AI runtime when available; otherwise it gives a built-in summary.</div>
+  </section>
+
+  <section id="view-social" hidden>
+    <div class="card"><h2>Social media studio</h2><p class="section-intro">Draft posts, organise content ideas and keep a simple publishing calendar. Posts are saved in this browser.</p>
+      <div class="grid-add" style="grid-template-columns:1fr"><input id="socialTitle" type="text" maxlength="100" placeholder="Post title or campaign"><div class="row"><select id="socialPlatform"><option>Instagram</option><option>LinkedIn</option><option>Facebook</option><option>X / Twitter</option><option>WhatsApp</option></select><select id="socialStatus"><option>Idea</option><option>Draft</option><option>Ready</option><option>Published</option></select><input id="socialDate" type="date"></div><textarea id="socialText" rows="5" maxlength="3000" placeholder="Write your post caption or content…"></textarea><div class="row"><button id="socialSave" type="button">Save post</button><button id="socialGenerate" type="button" class="secondary">AI improve / generate</button><button id="socialClear" type="button" class="secondary">Clear</button></div><div id="socialMsg" class="muted"></div></div>
+    </div>
+    <div class="card"><div class="row"><h2 style="flex:1;margin:0">Content planner</h2><select id="socialFilter"><option value="All">All posts</option><option>Idea</option><option>Draft</option><option>Ready</option><option>Published</option></select></div><div id="socialList" class="social-grid" style="margin-top:14px"></div><div id="socialEmpty" class="empty" hidden>No posts yet. Create your first social media draft above.</div></div>
+    <div class="notice">This is a content planner, not an auto-publisher. Connecting Instagram, LinkedIn or other accounts and publishing directly requires each platform’s authorised API integration.</div>
+  </section>
+
+  <section id="view-workspaces" hidden>
+    <div class="card">
+      <div class="row">
+        <select id="wsSelect" aria-label="Workspace"></select>
+        <input type="text" id="wsName" placeholder="New name, or type a name to rename" maxlength="60">
+        <button type="button" id="addWsBtn">New workspace</button>
+        <button type="button" class="secondary" id="renameWsBtn">Rename</button>
+        <button type="button" class="danger" id="deleteWsBtn">Delete</button>
+      </div>
+    </div>
+    <div class="card">
+      <form class="grid-add" id="addForm">
+        <input type="text" id="title" placeholder="What needs to be done?" required maxlength="200">
+        <select id="priority" aria-label="Priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
+        <input type="date" id="dueDate" aria-label="Due date">
+        <button type="submit">Add</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="row">
+        <input type="search" id="search" placeholder="Search tasks...">
+        <div class="row filters">
+          <button type="button" class="secondary active" data-filter="all">All</button>
+          <button type="button" class="secondary" data-filter="active">Active</button>
+          <button type="button" class="secondary" data-filter="completed">Completed</button>
+        </div>
+      </div>
+      <div class="muted" id="stats" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <ul class="tasks" id="taskList"></ul>
+      <div class="empty" id="emptyMsg" hidden>No tasks in this workspace.</div>
+    </div>
+    <div class="card">
+      <h2>Import tasks</h2>
+      <div class="muted" style="margin-bottom:8px">Columns: Title (required), Priority (low, medium, high), Due Date (YYYY-MM-DD)</div>
+      <div class="row">
+        <button type="button" class="secondary" id="importBtn">Import CSV or Excel</button>
+        <input type="file" id="importFile" accept=".csv,.xlsx,.xls,text/csv" hidden>
+        <span class="muted" id="importMsg"></span>
+      </div>
+      <textarea id="pasteArea" rows="5" style="margin-top:10px" placeholder="Title&#9;Priority&#9;Due Date&#10;Buy groceries&#9;high&#9;2026-12-01"></textarea>
+      <div class="row" style="margin-top:8px"><button type="button" id="pasteBtn">Add pasted tasks</button><span class="muted" id="pasteMsg"></span></div>
+      <div class="muted" style="margin-top:6px">Paste rows copied from Excel or Google Sheets, including the header row.</div>
+    </div>
+  </section>
+
+  <section id="view-calendar" hidden>
+    <div class="page-heading"><div><span class="eyebrow">PLAN YOUR TIME</span><h1>My Schedule</h1><p class="section-intro">Manage appointments, meetings, reminders and task deadlines in one calendar.</p></div></div>
+    <div class="card">
+      <div class="news-calendar-head"><div><span class="eyebrow">MONTH VIEW</span><h2 id="scheduleMonthLabel" style="margin:5px 0 0">Month</h2></div><div class="row"><button type="button" class="secondary" id="schedulePrev" aria-label="Previous month">‹</button><button type="button" class="secondary" id="scheduleToday">Today</button><button type="button" class="secondary" id="scheduleNext" aria-label="Next month">›</button></div></div>
+      <div class="news-calendar" id="scheduleCalendar" aria-label="Schedule calendar"></div>
+      <div class="meta" style="margin-top:12px"><span>● Events</span><span>◆ Task deadlines</span><span>Select a date to view its agenda</span></div>
+    </div>
+    <div class="card"><h2 id="scheduleDayTitle">Add to your schedule</h2><div class="grid-add"><input type="text" id="calTitle" placeholder="Event or appointment title" maxlength="200"><input type="date" id="calDate" aria-label="Date"><input type="time" id="calTime" aria-label="Time"><button type="button" id="calAddBtn">Add event</button></div><div class="muted" id="calMsg" style="margin-top:6px"></div></div>
+    <div class="card"><div class="news-calendar-head"><div><span class="eyebrow">YOUR PLAN</span><h2 style="margin:5px 0 0">Selected day agenda</h2></div><span class="muted">Events and open task deadlines</span></div><ul class="tasks" id="calList"></ul><div class="empty" id="calEmpty" hidden>Nothing scheduled for this date. Add an event above.</div></div>
+    <div class="card"><h2>Upcoming schedule</h2><div class="muted" style="margin-bottom:10px">Your next events and open tasks, in date order.</div><ul class="tasks" id="calUpcoming"></ul><div class="empty" id="calUpcomingEmpty" hidden>No upcoming items.</div></div>
+  </section>
+  <section id="view-news" hidden>
+    <div class="page-heading"><div><span class="eyebrow">NEWS & CURRENT AFFAIRS</span><h1>News Centre</h1><p class="section-intro">Choose a date, explore every category, and open current coverage from trusted news sources.</p></div></div>
+    <div class="card">
+      <div class="news-calendar-head"><div><span class="eyebrow">NEWS CALENDAR</span><h2 id="newsMonthLabel" style="margin:5px 0 0">Month</h2></div><div class="row"><button type="button" class="secondary" id="newsPrevMonth" aria-label="Previous month">‹</button><button type="button" class="secondary" id="newsToday">Today</button><button type="button" class="secondary" id="newsNextMonth" aria-label="Next month">›</button></div></div>
+      <div class="news-calendar" id="newsCalendar" aria-label="News calendar"></div>
+      <div class="row" style="margin-top:12px;align-items:center"><label class="muted" for="newsDateFilter">Selected date</label><input type="date" id="newsDateFilter"><button type="button" class="secondary" id="newsDateClear">Show all dates</button><span class="muted" id="newsSelectedLabel"></span></div>
+      <p class="muted" style="margin:10px 0 0">Dates with a dot contain news you have saved in this workspace. Select any date to filter your saved headlines.</p>
+    </div>
+    <div class="card"><div class="news-calendar-head"><div><span class="eyebrow">BROWSE BY TOPIC</span><h2 style="margin:5px 0 0">All news categories</h2></div><span class="muted">Opens latest coverage in Google News</span></div><div class="news-category-grid" id="newsCategoryLinks"></div></div>
+    <div class="card">
+      <div class="news-calendar-head"><div><span class="eyebrow">YOUR NEWS LIBRARY</span><h2 style="margin:5px 0 0">Saved headlines</h2></div><span class="muted">Add links or save articles manually</span></div>
+      <div class="card" style="background:var(--bg);box-shadow:none;margin:14px 0;padding:14px">
+        <h2>Add news</h2><div class="grid-add"><input type="text" id="newsHeadline" placeholder="Headline" maxlength="200"><select id="newsTopic" aria-label="Category"></select><input type="date" id="newsDate" aria-label="Date"><button type="button" id="addNewsBtn">Add</button></div>
+        <div class="row" style="margin-top:8px"><input type="url" id="newsUrl" placeholder="Article link starting with https:// (optional)" maxlength="400"></div><div class="muted" id="newsMsg" style="margin-top:6px"></div>
+        <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Add several headlines at once</summary><textarea id="newsBulk" rows="5" placeholder="One per line: Headline | Category | Date (YYYY-MM-DD) | https://link" style="margin-top:10px"></textarea><div class="row" style="margin-top:8px"><button type="button" id="newsBulkBtn">Add all</button><span class="muted" id="newsBulkMsg"></span></div></details>
+      </div>
+      <div class="row" id="newsChips" style="margin-bottom:12px"></div><div class="news-cols" id="newsList"></div><div class="empty" id="newsEmpty" hidden>No saved headlines for this date/category. Use the category links above to browse current coverage, or add a headline.</div>
+    </div>
+  </section>
+
+  <section id="view-blogs" hidden>
+    <div class="page-heading"><div><span class="eyebrow">YOUR WRITING SPACE</span><h1>My Blogs</h1><p class="section-intro">Your Blogger archive, organised in one place. Open any published article or jump to Blogger to edit and publish.</p></div><a class="primary-link" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Open Blogger dashboard ↗</a></div>
+    <div class="blog-toolbar"><input id="blogSearch" type="search" placeholder="Search your 18 articles…" aria-label="Search blog posts"><span class="muted">18 published posts · About Interest</span></div>
+    <div id="blogGrid" class="blog-grid">
+      <article class="blog-card" data-blog-card data-search="soft skill developed soft skills that industry demands in the workplace. career &amp; skills"><div class="blog-card-top"><span class="blog-category">Career &amp; Skills</span><span class="blog-date">May 4, 2024</span></div><h3>Soft skill</h3><p>Developed soft skills that industry demands in the workplace.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2024/05/soft-skill.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="money money and the power it holds. society"><div class="blog-card-top"><span class="blog-category">Society</span><span class="blog-date">May 7, 2023</span></div><h3>Money</h3><p>Money and the power it holds.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2023/05/money.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="suger relation love over lust. relationships"><div class="blog-card-top"><span class="blog-category">Relationships</span><span class="blog-date">May 6, 2023</span></div><h3>Suger relation</h3><p>Love over lust.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2023/05/suger-relation.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="origin of phone a look at the origin of the phone. technology"><div class="blog-card-top"><span class="blog-category">Technology</span><span class="blog-date">May 5, 2023</span></div><h3>Origin of phone</h3><p>A look at the origin of the phone.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2023/05/origin-of-phone.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="cyber crime exploring cyber crime in the e-world. technology"><div class="blog-card-top"><span class="blog-category">Technology</span><span class="blog-date">May 1, 2023</span></div><h3>Cyber crime</h3><p>Exploring cyber crime in the e-world.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2023/05/cyber-crime.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="decision that help to change our life life-changing decisions and their impact. personal growth"><div class="blog-card-top"><span class="blog-category">Personal Growth</span><span class="blog-date">Apr 8, 2023</span></div><h3>Decision that help to change our life</h3><p>Life-changing decisions and their impact.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2023/04/decision-that-help-to-change-our-life.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="simulation in human thoughts on simulation in human life. ideas"><div class="blog-card-top"><span class="blog-category">Ideas</span><span class="blog-date">Mar 25, 2023</span></div><h3>Simulation in human</h3><p>Thoughts on simulation in human life.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2023/03/simulation-in-human.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="how life changes after 10th and 12th changes that come after school. education"><div class="blog-card-top"><span class="blog-category">Education</span><span class="blog-date">Mar 23, 2023</span></div><h3>How life changes after 10th and 12th</h3><p>Changes that come after school.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2023/03/how-life-changes-after-10th-and-12th.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="our life expectation why we spoil reflecting on life and expectations. personal growth"><div class="blog-card-top"><span class="blog-category">Personal Growth</span><span class="blog-date">Mar 22, 2023</span></div><h3>Our life expectation why we spoil</h3><p>Reflecting on life and expectations.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2023/03/our-life-expectation-why-we-spoil.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="population effecting our world the effect of population on our world. society"><div class="blog-card-top"><span class="blog-category">Society</span><span class="blog-date">Oct 8, 2021</span></div><h3>Population Effecting our world</h3><p>The effect of population on our world.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/10/population-effecting-our-world.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="after coming of artificial intelligence [a.i] what its impact. the impact of artificial intelligence. technology"><div class="blog-card-top"><span class="blog-category">Technology</span><span class="blog-date">Sep 10, 2021</span></div><h3>After coming of artificial intelligence [A.I] what its impact.</h3><p>The impact of artificial intelligence.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/09/after-coming-of-artificial-intelligence.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="superstition why people believe in superstition. society"><div class="blog-card-top"><span class="blog-category">Society</span><span class="blog-date">Mar 17, 2021</span></div><h3>Superstition</h3><p>Why people believe in superstition.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/03/superstition.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="bollywood movies and hollywood moveis hollywood and bollywood cinema. entertainment"><div class="blog-card-top"><span class="blog-category">Entertainment</span><span class="blog-date">Mar 14, 2021</span></div><h3>Bollywood movies and Hollywood moveis</h3><p>Hollywood and Bollywood cinema.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/03/bollywood-movies-and-hollywood-moveis.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="childhood and adulthood thoughts on childhood days and adulthood. life"><div class="blog-card-top"><span class="blog-category">Life</span><span class="blog-date">Mar 13, 2021</span></div><h3>Childhood and adulthood</h3><p>Thoughts on childhood days and adulthood.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/03/childhood-and-adulthood.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="stephen hawking&#x27;s famous prediction stephen hawking&#x27;s famous five predictions. science"><div class="blog-card-top"><span class="blog-category">Science</span><span class="blog-date">Mar 12, 2021</span></div><h3>Stephen hawking&#x27;s famous prediction</h3><p>Stephen Hawking&#x27;s famous five predictions.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/03/stephen-hawkings-famous-prediction.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="schizophrenia an article about schizophrenia. psychology"><div class="blog-card-top"><span class="blog-category">Psychology</span><span class="blog-date">Mar 8, 2021</span></div><h3>Schizophrenia</h3><p>An article about schizophrenia.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/03/schizophrenia.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="language the role of languages in our world. society"><div class="blog-card-top"><span class="blog-category">Society</span><span class="blog-date">Mar 7, 2021</span></div><h3>Language</h3><p>The role of languages in our world.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/03/language.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+      <article class="blog-card" data-blog-card data-search="thinking about mental health for all around. a reflection on mental health for everyone. mental health"><div class="blog-card-top"><span class="blog-category">Mental Health</span><span class="blog-date">Mar 4, 2021</span></div><h3>Thinking about mental health for all around.</h3><p>A reflection on mental health for everyone.</p><div class="blog-actions"><a href="https://ishiagg12.blogspot.com/2021/03/thinking-about-mental-health-for-all.html" target="_blank" rel="noopener">Read article ↗</a><a class="edit-blog" href="https://draft.blogger.com/u/2/blog/posts/3272222070094339073?pli=1" target="_blank" rel="noopener">Manage</a></div></article>
+    </div><p id="blogNoResults" class="empty" hidden>No articles match your search.</p>
+    <div class="notice" style="margin-top:18px">This section displays the 18 published posts visible in your Blogger dashboard. Use “Manage” or “Open Blogger dashboard” to edit posts. Your Blogger account remains the source of truth; this workspace does not publish changes to Blogger.</div>
+  </section>
+
+  <section id="view-suggestions" hidden>
+    <div class="card">
+      <h2>Suggestion box</h2>
+      <div class="muted" style="margin-bottom:10px">Share ideas to improve this task manager. Suggestions are saved with your data.</div>
+      <div class="row">
+        <select id="sugType" aria-label="Type"><option value="Feature">Feature</option><option value="Layout">Layout</option><option value="Bug">Bug</option><option value="Other">Other</option></select>
+        <input type="text" id="sugName" placeholder="Your name (optional)" maxlength="60">
+        <button type="button" id="sugBtn">Submit</button>
+      </div>
+      <textarea id="sugText" rows="4" style="margin-top:8px" placeholder="Write your suggestion..." maxlength="1000"></textarea>
+      <div class="muted" id="sugMsg" style="margin-top:6px"></div>
+    </div>
+    <div class="card">
+      <h2>All suggestions</h2>
+      <ul class="tasks" id="sugList"></ul>
+      <div class="empty" id="sugEmpty" hidden>No suggestions yet.</div>
+    </div>
+  </section>
+
+  <section id="view-reports" hidden>
+    <div class="card">
+      <div class="row"><h2 style="margin:0;flex:1">Report</h2><button type="button" class="secondary" id="printBtn">Print or save as PDF</button></div>
+      <div class="muted" style="margin-top:6px">Built from your current tasks, news, and events. It updates automatically.</div>
+    </div>
+    <div id="reportBody"></div>
+  </section>
+  <section id="view-assistant" hidden>
+    <div class="card">
+      <h2>Work assistant</h2>
+      <div class="row" style="margin-bottom:12px">
+        <select id="aiScope" aria-label="Scope"><option value="ws">Current workspace</option><option value="all">All workspaces</option></select>
+      </div>
+      <div class="ai-buttons">
+        <button type="button" class="secondary" data-ai="Summarize my progress and point out what matters most.">Summarize progress</button>
+        <button type="button" class="secondary" data-ai="Suggest the order to tackle my open tasks and briefly explain why, using due dates and priority.">Prioritise tasks</button>
+        <button type="button" class="secondary" data-ai="Point out overdue or at-risk tasks and suggest concrete next steps for each.">Spot risks</button>
+        <button type="button" class="secondary" data-ai="Suggest a simple plan for the next 7 days based on due dates and priority.">Plan my week</button>
+      </div>
+      <div class="row"><input type="text" id="aiQuestion" placeholder="Ask anything about your tasks..." maxlength="500"><button type="button" id="aiAsk">Ask</button></div>
+    </div>
+    <div class="card"><div class="ai-out" id="aiOut">Choose a quick action or ask a question. The assistant only reads your task list.</div></div>
+  </section>
+</div>
+  <footer class="app-footer"><span>ISHIKA WORKHUB</span><span>One space for your work, ideas and updates.</span><span id="footerYear"></span></footer>
+
+</div>
+
+<script>
+document.body.dataset.view = "dashboard";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const PRI = { high: 0, medium: 1, low: 2 };
+
+// Global workspace utilities: local theme preference and portable JSON backup.
+(function initWorkHubUtilities(){
+  const savedTheme = localStorage.getItem("workhub-theme");
+  if (savedTheme === "dark") document.body.dataset.theme = "dark";
+  const dateLabel = document.getElementById("todayLabel");
+  if (dateLabel) dateLabel.textContent = new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  const year = document.getElementById("footerYear"); if (year) year.textContent = "© " + new Date().getFullYear();
+  const theme = document.getElementById("themeToggle");
+  if (theme) theme.addEventListener("click",()=>{const dark=document.body.dataset.theme!=="dark";if(dark)document.body.dataset.theme="dark";else delete document.body.dataset.theme;localStorage.setItem("workhub-theme",dark?"dark":"light");theme.innerHTML=dark?"☀ <span>Light mode</span>":"☾ <span>Dark mode</span>";});
+  if (theme && document.body.dataset.theme === "dark") theme.innerHTML="☀ <span>Light mode</span>";
+  const backup=document.getElementById("exportBackup");
+  if(backup) backup.addEventListener("click",()=>{try{const payload={app:"Ishika WorkHub",exportedAt:new Date().toISOString(),data:state};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="Ishika-WorkHub-backup-"+today()+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}catch(e){alert("Could not export your backup in this browser.");}});
+})();
+
+let state = { workspaces: [{ id: "w1", name: "Work" }, { id: "w2", name: "Home" }], tasks: [], activeWs: "w1", news: [], suggestions: [], events: [], socialPosts: [] };
+let scheduleCursor = new Date(); scheduleCursor.setDate(1);
+let scheduleSelected = today();
+let filter = "all", search = "", editingId = null, nextId = Date.now(), newsCat = "";
+let db = null, userId = null, sampleFn = null, loaded = false, saveTimer = null;
+
+function today() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+function addDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+function fmt(s) { if (!s) return ""; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); }
+const isOverdue = t => !t.done && t.due && t.due < today();
+const wsName = id => (state.workspaces.find(w => w.id === id) || {}).name || "Unassigned";
+function toIsoDate(s) { if (!s) return ""; if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const d = new Date(s); if (isNaN(d)) return ""; return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+
+/* ---------- storage ---------- */
+const docPath = () => "data/users/" + userId + "/workspace";
+let dirty = false;
+function save() {
+  dirty = true;
+  if (!loaded) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try { localStorage.setItem("taskmgr", JSON.stringify(state)); } catch (e) {}
+    if (db) { try { await db.doc(docPath()).set(state); } catch (e) {} }
+  }, 400);
+}
+async function load() {
+  try { const s = JSON.parse(localStorage.getItem("taskmgr") || "null"); if (s && Array.isArray(s.workspaces)) state = s; } catch (e) {}
+  try {
+    const user = await claude.use("user"), dbNs = await claude.use("db");
+    if (user && dbNs) {
+      userId = await user.id(); db = dbNs;
+      const got = await db.doc(docPath()).get();
+      const data = got && (got.data ?? got);
+      if (!dirty && data && Array.isArray(data.workspaces)) state = data;
+    }
+  } catch (e) {}
+  try { sampleFn = await claude.use("sample"); } catch (e) {}
+  if (!state.workspaces.length) state.workspaces = [{ id: "w1", name: "Work" }];
+  if (!state.workspaces.some(w => w.id === state.activeWs)) state.activeWs = state.workspaces[0].id;
+  if (!Array.isArray(state.tasks)) state.tasks = [];
+  if (!Array.isArray(state.news)) state.news = [];
+  if (!Array.isArray(state.suggestions)) state.suggestions = [];
+  if (!Array.isArray(state.events)) state.events = [];
+  if (!Array.isArray(state.socialPosts)) state.socialPosts = [];
+  loaded = true;
+  if (dirty) save();
+  if (!sampleFn) $("#aiOut").textContent = "Built-in workspace assistant is ready. Connect a compatible AI runtime for generative answers.";
+  render();
+  renderSocial();
+}
+
+/* ---------- tasks ---------- */
+function addTask(title, priority, due, ws = state.activeWs) {
+  state.tasks.push({ id: nextId++, ws, title: title.slice(0, 200), priority, due: due || "", done: false });
+}
+function importRows(rows) {
+  if (rows.length < 2) return 0;
+  const headers = rows[0].map(h => h.trim().toLowerCase().replace(/[\s_-]/g, ""));
+  const col = names => headers.findIndex(h => names.includes(h));
+  const iTitle = col(["title", "task", "name"]), iPri = col(["priority"]), iDue = col(["duedate", "due", "date"]);
+  if (iTitle === -1) return 0;
+  let count = 0;
+  rows.slice(1).forEach(r => {
+    const title = (r[iTitle] || "").trim();
+    if (!title) return;
+    const p = iPri === -1 ? "" : (r[iPri] || "").trim().toLowerCase();
+    addTask(title, ["low", "medium", "high"].includes(p) ? p : "medium", iDue === -1 ? "" : toIsoDate((r[iDue] || "").trim()));
+    count++;
+  });
+  return count;
+}
+function parseCsv(text) {
+  const rows = []; let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) { if (c === '"' && text[i + 1] === '"') { field += '"'; i++; } else if (c === '"') inQuotes = false; else field += c; }
+    else if (c === '"') inQuotes = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(field); rows.push(row); row = []; field = ""; }
+    else field += c;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(v => v.trim() !== ""));
+}
+function handleFile(file) {
+  const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+  const reader = new FileReader();
+  reader.onload = () => {
+    let msg;
+    try {
+      let text = String(reader.result).replace(/^\uFEFF/, "");
+      if (isExcel) { const wb = XLSX.read(reader.result, { type: "array" }); text = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]); }
+      const n = importRows(parseCsv(text));
+      msg = "Imported " + n + " task" + (n === 1 ? "" : "s") + ".";
+    } catch (e) { msg = "Could not read that file. Check that it is a valid CSV or Excel file."; }
+    $("#importMsg").textContent = msg; $("#importFile").value = ""; save(); render();
+  };
+  if (isExcel) reader.readAsArrayBuffer(file); else reader.readAsText(file);
+}
+function importPasted() {
+  const text = $("#pasteArea").value.trim();
+  if (!text) { $("#pasteMsg").textContent = "Paste some rows first."; return; }
+  const rows = text.includes("\t") ? text.split(/\r?\n/).map(l => l.split("\t")).filter(r => r.some(v => v.trim() !== "")) : parseCsv(text);
+  const n = importRows(rows);
+  $("#pasteMsg").textContent = n ? "Added " + n + " task" + (n === 1 ? "" : "s") + "." : "No tasks found. Make sure the first row has a Title column.";
+  if (n) { $("#pasteArea").value = ""; save(); render(); }
+}
+
+/* ---------- rendering ---------- */
+function renderDashboard() {
+  const all = state.tasks, active = all.filter(t => !t.done);
+  const overdue = active.filter(isOverdue).length;
+  const week = active.filter(t => t.due && t.due >= today() && t.due <= addDays(7)).length;
+  const stat = (label, val, cls = "") => `<div class="stat ${cls}"><div class="num">${val}</div><div class="lbl">${label}</div></div>`;
+  const wsRows = state.workspaces.map(w => {
+    const list = all.filter(t => t.ws === w.id), done = list.filter(t => t.done).length;
+    const pct = list.length ? Math.round(done / list.length * 100) : 0;
+    return `<div class="wsrow"><div class="wsline"><b>${esc(w.name)}</b><span class="muted">${done}/${list.length} done</span></div><div class="bar"><div style="width:${pct}%"></div></div></div>`;
+  }).join("");
+  const pri = ["high", "medium", "low"].map(p => `<div class="prow"><span class="badge ${p}">${p}</span><span>${active.filter(t => t.priority === p).length} active</span></div>`).join("");
+  const upcoming = active.filter(t => t.due).sort((a, b) => a.due < b.due ? -1 : 1).slice(0, 5)
+    .map(t => `<div class="prow"><span>${esc(t.title)}</span><span class="${isOverdue(t) ? "overdue" : "muted"}">${fmt(t.due)}</span></div>`).join("");
+  $("#view-dashboard").innerHTML = `
+    <div class="stats-grid">${stat("Total", all.length)}${stat("Active", active.length)}${stat("Completed", all.length - active.length)}${stat("Overdue", overdue, overdue ? "warn" : "")}${stat("Due in 7 days", week)}</div>
+    <div class="card"><h2>Progress by workspace</h2>${wsRows}</div>
+    <div class="card"><h2>Active tasks by priority</h2>${pri}</div>
+    <div class="card"><h2>Upcoming due dates</h2>${upcoming || '<div class="muted">No upcoming due dates.</div>'}</div>`;
+}
+function taskRow(t) {
+  const od = isOverdue(t);
+  return `<li class="task ${t.done ? "done" : ""}">
+    <input type="checkbox" data-act="toggle" data-id="${t.id}" ${t.done ? "checked" : ""} aria-label="Mark complete">
+    <div class="task-body"><div class="task-title">${esc(t.title)}</div>
+      <div class="meta"><span class="badge ${t.priority}">${t.priority}</span>${t.due ? `<span class="${od ? "overdue" : ""}">Due ${fmt(t.due)}${od ? " (overdue)" : ""}</span>` : ""}</div></div>
+    <div class="actions"><button class="secondary" data-act="edit" data-id="${t.id}">Edit</button><button class="danger" data-act="del" data-id="${t.id}">Delete</button></div></li>`;
+}
+function editRow(t) {
+  return `<li class="task"><div class="edit-row">
+    <input class="e-title" value="${esc(t.title)}" maxlength="200">
+    <select class="e-pri">${["low", "medium", "high"].map(p => `<option value="${p}" ${p === t.priority ? "selected" : ""}>${p}</option>`).join("")}</select>
+    <input class="e-due" type="date" value="${esc(t.due)}">
+    <button data-act="save" data-id="${t.id}">Save</button><button class="secondary" data-act="cancel">Cancel</button>
+  </div></li>`;
+}
+function renderWorkspaces() {
+  $("#wsSelect").innerHTML = state.workspaces.map(w => `<option value="${esc(w.id)}" ${w.id === state.activeWs ? "selected" : ""}>${esc(w.name)}</option>`).join("");
+  const inWs = state.tasks.filter(t => t.ws === state.activeWs);
+  const shown = inWs
+    .filter(t => filter === "all" || (filter === "active" ? !t.done : t.done))
+    .filter(t => !search || t.title.toLowerCase().includes(search))
+    .sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      if (a.due !== b.due) { if (!a.due) return 1; if (!b.due) return -1; return a.due < b.due ? -1 : 1; }
+      return PRI[a.priority] - PRI[b.priority];
+    });
+  $("#taskList").innerHTML = shown.map(t => editingId === t.id ? editRow(t) : taskRow(t)).join("");
+  $("#emptyMsg").hidden = shown.length > 0;
+  const done = inWs.filter(t => t.done).length;
+  $("#stats").textContent = (inWs.length - done) + " active · " + done + " completed";
+}
+const NEWS_CATS = ["India", "World", "Politics", "Business", "Economy", "Technology", "Artificial Intelligence", "Science", "Education", "Health", "Environment", "Social Impact", "NGO & Charity", "Fundraising", "Sports", "Entertainment", "Korean News", "K-pop", "Music"];
+let newsCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+function renderNewsCalendar() {
+  const year = newsCalendarMonth.getFullYear(), month = newsCalendarMonth.getMonth();
+  $("#newsMonthLabel").textContent = newsCalendarMonth.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const first = new Date(year,month,1), offset = (first.getDay()+6)%7, days = new Date(year,month+1,0).getDate();
+  const selected = $("#newsDateFilter").value;
+  const counts = new Set(state.news.map(n=>n.date));
+  let html = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>`<div class="news-day-name">${d}</div>`).join("");
+  for(let i=0;i<42;i++) { const dayNum=i-offset+1, date=new Date(year,month,dayNum), iso=[date.getFullYear(),String(date.getMonth()+1).padStart(2,"0"),String(date.getDate()).padStart(2,"0")].join("-"); const inMonth=dayNum>=1&&dayNum<=days; html += `<button type="button" class="news-day ${inMonth?"":"muted-day"} ${selected===iso?"selected":""} ${counts.has(iso)?"has-news":""}" data-news-day="${iso}" ${inMonth?"":"disabled"}>${inMonth?dayNum:""}</button>`; }
+  $("#newsCalendar").innerHTML=html;
+  $("#newsSelectedLabel").textContent=selected?new Date(selected+"T12:00:00").toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}):"Showing all dates";
+}
+function renderNewsCategoryLinks() {
+  const cats=[...NEWS_CATS,"General"];
+  $("#newsCategoryLinks").innerHTML=cats.map(c=>{const url="https://news.google.com/search?q="+encodeURIComponent(c)+"&hl=en-IN&gl=IN&ceid=IN%3Aen";return `<a class="news-category-link" href="${url}" target="_blank" rel="noopener noreferrer"><span>${esc(c)}</span><span>↗</span></a>`;}).join("");
+  $("#newsTopic").innerHTML='<option value="">General</option>'+cats.filter(c=>c!=="General").map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+}
+function renderNews() {
+  renderNewsCalendar();
+  renderNewsCategoryLinks();
+  const day = $("#newsDateFilter").value;
+  const shown = [...state.news]
+    .filter(n => (!day || n.date === day) && (!newsCat || (n.topic || "General") === newsCat))
+    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || b.id - a.id);
+  const groups = Object.create(null);
+  shown.forEach(n => { const k = n.topic || "General"; (groups[k] = groups[k] || []).push(n); });
+  const item = n => `<div class="news-item ${n.important ? "hot" : ""}">
+    <div class="meta"><b>${esc(n.date)}</b></div>
+    <div class="task-title">${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer" style="color:inherit">${esc(n.headline)}</a>` : esc(n.headline)}</div>
+    <div class="actions" style="margin-top:6px">
+      <button class="secondary" data-news="star" data-id="${n.id}">${n.important ? "Unhighlight" : "Highlight"}</button>
+      <button class="danger" data-news="del" data-id="${n.id}">Delete</button>
+    </div></div>`;
+  const col = (title, list, cls = "") => `<div class="news-col ${cls}"><div class="news-col-head"><b>${esc(title)}</b><span class="muted">${list.length}</span></div>${list.map(item).join("")}</div>`;
+  const highlights = shown.filter(n => n.important);
+  const extra = Object.keys(groups).filter(k => !NEWS_CATS.includes(k) && k !== "General");
+  let out = highlights.length ? col("Highlights", highlights, "hot-col") : "";
+  [...NEWS_CATS, ...extra, "General"].forEach(k => { if (groups[k]) out += col(k, groups[k]); });
+  $("#newsList").innerHTML = out;
+  $("#newsEmpty").hidden = shown.length > 0;
+  $("#newsChips").innerHTML = ["", ...NEWS_CATS, "General"].map(c => `<button type="button" class="${newsCat === c ? "" : "secondary"}" data-cat="${esc(c)}">${c || "All"}</button>`).join("");
+}
+
+function render() {
+  renderDashboard();
+  renderWorkspaces();
+  renderNews();
+  renderSuggestions();
+  renderCalendar();
+  renderReports();
+}
+
+function renderSuggestions() {
+  const items = [...state.suggestions].sort((a, b) => b.id - a.id);
+  $("#sugList").innerHTML = items.map(s => `<li class="task ${s.done ? "done" : ""}">
+    <input type="checkbox" data-sug="done" data-id="${s.id}" ${s.done ? "checked" : ""} aria-label="Mark as done">
+    <div class="task-body"><div class="task-title">${esc(s.text)}</div>
+      <div class="meta"><span class="badge low">${esc(s.type)}</span><span>${esc(s.name || "Anonymous")}</span><span>${esc(s.date)}</span></div></div>
+    <div class="actions"><button class="danger" data-sug="del" data-id="${s.id}">Delete</button></div></li>`).join("");
+  $("#sugEmpty").hidden = items.length > 0;
+}
+$("#sugBtn").addEventListener("click", () => {
+  const text = $("#sugText").value.trim();
+  if (!text) { $("#sugMsg").textContent = "Please write a suggestion first."; return; }
+  state.suggestions.push({ id: Date.now(), type: $("#sugType").value, name: $("#sugName").value.trim().slice(0, 60), text: text.slice(0, 1000), date: today(), done: false });
+  $("#sugText").value = "";
+  $("#sugMsg").textContent = "Thank you. Your suggestion was saved.";
+  save(); render();
+});
+$("#sugList").addEventListener("click", e => {
+  const b = e.target.closest("[data-sug]"); if (!b) return;
+  const id = Number(b.dataset.id), s = state.suggestions.find(x => x.id === id);
+  if (b.dataset.sug === "done" && s) s.done = b.checked;
+  else if (b.dataset.sug === "del") state.suggestions = state.suggestions.filter(x => x.id !== id);
+  save(); render();
+});
+
+function renderCalendar() {
+  const monthLabel = $("#scheduleMonthLabel"); if (!monthLabel) return;
+  const year=scheduleCursor.getFullYear(), month=scheduleCursor.getMonth();
+  monthLabel.textContent=scheduleCursor.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const offset=(new Date(year,month,1).getDay()+6)%7, days=new Date(year,month+1,0).getDate();
+  let cells=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>`<div class="news-day-name">${d}</div>`).join("");
+  const eventDates=new Set(state.events.map(e=>e.date)), taskDates=new Set(state.tasks.filter(t=>t.due&&!t.done).map(t=>t.due));
+  for(let i=0;i<42;i++){const day=i-offset+1;if(day<1||day>days){cells+='<div aria-hidden="true"></div>';continue;}
+    const date=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`, ev=eventDates.has(date), task=taskDates.has(date);
+    cells+=`<button type="button" class="news-day ${date===scheduleSelected?"selected":""} ${ev||task?"has-news":""}" data-schedule-date="${date}" aria-pressed="${date===scheduleSelected}">${day}${ev||task?`<small style="display:block;font-size:9px;line-height:1.2">${ev?"●":""}${task?"◆":""}</small>`:""}</button>`;
+  }
+  $("#scheduleCalendar").innerHTML=cells; $("#scheduleDayTitle").textContent=`Add to your schedule · ${fmt(scheduleSelected)}`; $("#calDate").value=scheduleSelected;
+  const all=[...state.events.map(e=>({date:e.date,time:e.time||"",title:e.title,kind:"Event",id:e.id})),...state.tasks.filter(t=>t.due&&!t.done).map(t=>({date:t.due,time:"",title:t.title,kind:"Task",id:null}))].sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  const list=items=>items.map(i=>`<li class="task"><div class="task-body"><div class="task-title">${esc(i.title)}</div><div class="meta"><b>${esc(fmt(i.date))}</b>${i.time?`<span>${esc(i.time)}</span>`:""}<span class="badge ${i.kind==="Task"?"medium":"low"}">${i.kind}</span></div></div>${i.id?`<div class="actions"><button class="danger" data-ev="del" data-id="${i.id}">Delete</button></div>`:""}</li>`).join("");
+  const selected=all.filter(i=>i.date===scheduleSelected); $("#calList").innerHTML=list(selected); $("#calEmpty").hidden=selected.length>0;
+  const upcoming=all.filter(i=>i.date>=today()).slice(0,12); $("#calUpcoming").innerHTML=list(upcoming); $("#calUpcomingEmpty").hidden=upcoming.length>0;
+}
+$("#scheduleCalendar").addEventListener("click",e=>{const b=e.target.closest("[data-schedule-date]");if(!b)return;scheduleSelected=b.dataset.scheduleDate;renderCalendar();});
+$("#schedulePrev").addEventListener("click",()=>{scheduleCursor.setMonth(scheduleCursor.getMonth()-1);renderCalendar();});
+$("#scheduleNext").addEventListener("click",()=>{scheduleCursor.setMonth(scheduleCursor.getMonth()+1);renderCalendar();});
+$("#scheduleToday").addEventListener("click",()=>{scheduleCursor=new Date();scheduleCursor.setDate(1);scheduleSelected=today();renderCalendar();});
+$("#calAddBtn").addEventListener("click",()=>{const title=$("#calTitle").value.trim(),date=$("#calDate").value;if(!title||!date){$("#calMsg").textContent="Enter an event title and date.";return;}state.events.push({id:Date.now(),title:title.slice(0,200),date,time:$("#calTime").value});scheduleSelected=date;scheduleCursor=new Date(date+"T12:00:00");scheduleCursor.setDate(1);$("#calTitle").value="";$("#calTime").value="";$("#calMsg").textContent="Event added to your schedule.";save();render();});
+function deleteCalendarEvent(e){const b=e.target.closest("[data-ev]");if(!b)return;const id=Number(b.dataset.id);state.events=state.events.filter(x=>x.id!==id);save();render();}
+$("#calList").addEventListener("click",deleteCalendarEvent); $("#calUpcoming").addEventListener("click",deleteCalendarEvent);
+
+function renderReports() {
+  const t = state.tasks, open = t.filter(x => !x.done), done = t.length - open.length;
+  const overdue = open.filter(isOverdue);
+  const pct = t.length ? Math.round(done / t.length * 100) : 0;
+  const wk = addDays(7);
+  const soon = [
+    ...state.events.filter(e => e.date >= today() && e.date <= wk).map(e => ({ date: e.date, title: e.title })),
+    ...open.filter(x => x.due && x.due >= today() && x.due <= wk).map(x => ({ date: x.due, title: x.title }))
+  ].sort((a, b) => a.date < b.date ? -1 : 1);
+  const byCat = Object.create(null);
+  state.news.forEach(n => { const k = n.topic || "General"; byCat[k] = (byCat[k] || 0) + 1; });
+  const highlights = state.news.filter(n => n.important).length;
+  const wsRows = state.workspaces.map(w => {
+    const l = t.filter(x => x.ws === w.id), d = l.filter(x => x.done).length;
+    return `<div class="prow"><span>${esc(w.name)}</span><span>${d}/${l.length} done</span></div>`;
+  }).join("");
+  const catRows = Object.keys(byCat).sort().map(k => `<div class="prow"><span>${esc(k)}</span><span>${byCat[k]}</span></div>`).join("") || '<div class="muted">No news saved.</div>';
+  const overdueRows = overdue.map(x => `<div class="prow"><span>${esc(x.title)}</span><span class="overdue">${esc(fmt(x.due))}</span></div>`).join("") || '<div class="muted">No overdue tasks.</div>';
+  const soonRows = soon.map(x => `<div class="prow"><span>${esc(x.title)}</span><span class="muted">${esc(fmt(x.date))}</span></div>`).join("") || '<div class="muted">Nothing due in the next 7 days.</div>';
+  $("#reportBody").innerHTML = `
+    <div class="stats-grid">
+      <div class="stat"><div class="num">${t.length}</div><div class="lbl">Tasks</div></div>
+      <div class="stat"><div class="num">${pct}%</div><div class="lbl">Completed</div></div>
+      <div class="stat ${overdue.length ? "warn" : ""}"><div class="num">${overdue.length}</div><div class="lbl">Overdue</div></div>
+      <div class="stat"><div class="num">${state.news.length}</div><div class="lbl">News (${highlights} highlighted)</div></div>
+    </div>
+    <div class="card"><h2>Workspaces</h2>${wsRows || '<div class="muted">No workspaces.</div>'}</div>
+    <div class="card"><h2>Overdue tasks</h2>${overdueRows}</div>
+    <div class="card"><h2>Due or scheduled in the next 7 days</h2>${soonRows}</div>
+    <div class="card"><h2>News by category</h2>${catRows}</div>`;
+}
+$("#printBtn").addEventListener("click", () => window.print());
+
+/* ---------- AI ---------- */
+function localInsight(prompt) {
+  const open = state.tasks.filter(t => !t.done), done = state.tasks.filter(t => t.done);
+  const overdue = open.filter(t => t.due && t.due < today());
+  const dueSoon = open.filter(t => t.due && t.due >= today() && t.due <= addDays(7));
+  const p = prompt.toLowerCase();
+  if (p.includes('overdue') || p.includes('risk')) return overdue.length ? `You have ${overdue.length} overdue task(s):\n${overdue.map(t => `• ${t.title} — due ${fmt(t.due)} (${t.priority} priority)`).join('\n')}\n\nStart with the highest-priority overdue item and update its due date if needed.` : 'Great — there are no overdue open tasks.';
+  if (p.includes('progress') || p.includes('summar')) return `Workspace progress: ${done.length} completed and ${open.length} still open (${state.tasks.length ? Math.round(done.length/state.tasks.length*100) : 0}% complete).\n${overdue.length} overdue; ${dueSoon.length} due in the next 7 days.\nYou have ${state.news.length} saved news item(s), ${state.events.length} event(s), and ${state.socialPosts.length} social draft(s).`;
+  if (p.includes('today') || p.includes('focus') || p.includes('priorit')) { const ranked=[...open].sort((a,b)=>({high:0,medium:1,low:2}[a.priority]??1)-({high:0,medium:1,low:2}[b.priority]??1) || (a.due||'9999').localeCompare(b.due||'9999')).slice(0,5); return ranked.length ? `Suggested focus order:\n${ranked.map((t,i)=>`${i+1}. ${t.title} — ${t.priority} priority${t.due ? `, due ${fmt(t.due)}` : ''}`).join('\n')}\n\nDo the most urgent high-priority task first.` : 'You have no open tasks. Add a task or use this time to plan ahead.'; }
+  return `I can help with your workspace. You currently have ${open.length} open tasks, ${overdue.length} overdue tasks and ${done.length} completed tasks. Try asking “What should I focus on today?” or “Summarise my progress”. For open-ended generative answers, connect a compatible AI runtime.`;
+}
+
+async function runAI(prompt, out) {
+  out.hidden = false;
+  out.textContent = "Thinking…";
+  if (!sampleFn) { out.textContent = localInsight(prompt); return; }
+  try {
+    const r = await sampleFn(prompt, { onText: ({ text }) => { out.textContent = text; }, modelTier: "default" });
+    if (r && r.text) out.textContent = r.text;
+  } catch (e) {
+    out.textContent = e && e.code === "not_granted"
+      ? "The assistant needs your permission. Allow it from the page's Permissions menu and try again."
+      : "The assistant is unavailable right now. Please try again.";
+  }
+}
+function askAI(instruction) {
+  if (!instruction) { $("#aiOut").textContent = "Type a question first."; return; }
+  const list = $("#aiScope").value === "all" ? state.tasks : state.tasks.filter(t => t.ws === state.activeWs);
+  const lines = list.map(t => `- [${t.done ? "done" : "open"}] ${t.title} | workspace: ${wsName(t.ws)} | priority: ${t.priority} | due: ${t.due || "none"}`).join("\n") || "(no tasks)";
+  runAI(`You are a concise work assistant helping the user maintain their work and track tasks. Use only the task list below. Today is ${today()}. Answer in short bullet points.\n\nTask list:\n${lines}\n\nRequest: ${instruction}`, $("#aiOut"));
+}
+
+/* ---------- events ---------- */
+document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(b => { b.classList.toggle("active", b === btn); if(b===btn)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current"); });
+  ["dashboard", "chatbot", "workspaces", "news", "blogs", "social", "calendar", "reports", "assistant", "suggestions"].forEach(v => $("#view-" + v).hidden = v !== btn.dataset.tab);
+  document.body.dataset.view = btn.dataset.tab;
+  render();
+}));
+$("#addForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const title = $("#title").value.trim();
+  if (!title) return;
+  addTask(title, $("#priority").value, $("#dueDate").value);
+  e.target.reset(); $("#priority").value = "medium"; $("#title").focus();
+  save(); render();
+});
+$("#search").addEventListener("input", e => { search = e.target.value.trim().toLowerCase(); renderWorkspaces(); });
+document.querySelectorAll("[data-filter]").forEach(btn => btn.addEventListener("click", () => {
+  filter = btn.dataset.filter;
+  document.querySelectorAll("[data-filter]").forEach(b => b.classList.toggle("active", b === btn));
+  renderWorkspaces();
+}));
+$("#taskList").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const act = b.dataset.act, id = Number(b.dataset.id), t = state.tasks.find(x => x.id === id);
+  if (act === "toggle" && t) t.done = !t.done;
+  else if (act === "edit") editingId = id;
+  else if (act === "cancel") editingId = null;
+  else if (act === "del") state.tasks = state.tasks.filter(x => x.id !== id);
+  else if (act === "save" && t) {
+    const li = b.closest("li"), title = li.querySelector(".e-title").value.trim();
+    if (title) { t.title = title.slice(0, 200); t.priority = li.querySelector(".e-pri").value; t.due = li.querySelector(".e-due").value; }
+    editingId = null;
+  }
+  save(); render();
+});
+$("#wsSelect").addEventListener("change", e => { state.activeWs = e.target.value; editingId = null; save(); render(); });
+$("#addWsBtn").addEventListener("click", () => {
+  const name = $("#wsName").value.trim(); if (!name) return;
+  const id = "w" + Date.now();
+  state.workspaces.push({ id, name: name.slice(0, 60) }); state.activeWs = id;
+  $("#wsName").value = ""; save(); render();
+});
+$("#renameWsBtn").addEventListener("click", () => {
+  const name = $("#wsName").value.trim(), ws = state.workspaces.find(w => w.id === state.activeWs);
+  if (!name || !ws) return;
+  ws.name = name.slice(0, 60); $("#wsName").value = ""; save(); render();
+});
+$("#deleteWsBtn").addEventListener("click", () => {
+  if (state.workspaces.length < 2) { $("#wsName").placeholder = "You need at least one workspace"; return; }
+  const oldId = state.activeWs;
+  state.workspaces = state.workspaces.filter(w => w.id !== oldId);
+  state.activeWs = state.workspaces[0].id;
+  state.tasks.forEach(t => { if (t.ws === oldId) t.ws = state.activeWs; });
+  editingId = null; save(); render();
+});
+$("#importBtn").addEventListener("click", () => $("#importFile").click());
+$("#importFile").addEventListener("change", e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+$("#pasteBtn").addEventListener("click", importPasted);
+
+$("#addNewsBtn").addEventListener("click", () => {
+  const headline = $("#newsHeadline").value.trim(), url = $("#newsUrl").value.trim();
+  if (!headline) { $("#newsMsg").textContent = "Enter a headline."; return; }
+  if (/^https?:\/\//i.test(headline)) { $("#newsMsg").textContent = "The headline should be the news title. Put the web address in the link box."; return; }
+  if (url && !/^https:\/\//i.test(url)) { $("#newsMsg").textContent = "Links must start with https://"; return; }
+  state.news.push({ id: Date.now(), headline: headline.slice(0, 200), topic: $("#newsTopic").value.trim().slice(0, 40), date: $("#newsDate").value || today(), url, important: false });
+  ["#newsHeadline", "#newsTopic", "#newsUrl"].forEach(sel => $(sel).value = "");
+  $("#newsMsg").textContent = "Saved."; save(); render();
+});
+$("#newsBulkBtn").addEventListener("click", () => {
+  const lines = $("#newsBulk").value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let added = 0, skipped = 0;
+  lines.forEach((line, i) => {
+    const parts = line.split("|").map(s => s.trim());
+    const headline = (parts[0] || "").slice(0, 200), topic = (parts[1] || "").slice(0, 40);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(parts[2] || "") ? parts[2] : today();
+    const url = parts[3] || "";
+    if (!headline || /^https?:\/\//i.test(headline) || (url && !/^https:\/\//i.test(url))) { skipped++; return; }
+    state.news.push({ id: Date.now() + i, headline, topic, date, url, important: false });
+    added++;
+  });
+  $("#newsBulkMsg").textContent = "Added " + added + (skipped ? ", skipped " + skipped : "") + ".";
+  if (added) $("#newsBulk").value = "";
+  save(); render();
+});
+$("#newsDateFilter").addEventListener("change", renderNews);
+$("#newsDateClear").addEventListener("click", () => { $("#newsDateFilter").value = ""; renderNews(); });
+$("#newsPrevMonth").addEventListener("click",()=>{newsCalendarMonth=new Date(newsCalendarMonth.getFullYear(),newsCalendarMonth.getMonth()-1,1);renderNewsCalendar();});
+$("#newsNextMonth").addEventListener("click",()=>{newsCalendarMonth=new Date(newsCalendarMonth.getFullYear(),newsCalendarMonth.getMonth()+1,1);renderNewsCalendar();});
+$("#newsToday").addEventListener("click",()=>{const d=today();$("#newsDateFilter").value=d;newsCalendarMonth=new Date(d+"T12:00:00");renderNews();});
+$("#newsCalendar").addEventListener("click",e=>{const b=e.target.closest("[data-news-day]");if(!b)return;$("#newsDateFilter").value=b.dataset.newsDay;renderNews();});
+$("#newsChips").addEventListener("click", e => {
+  const b = e.target.closest("[data-cat]"); if (!b) return;
+  newsCat = b.dataset.cat; renderNews();
+});
+$("#newsList").addEventListener("click", e => {
+  const b = e.target.closest("[data-news]"); if (!b) return;
+  const id = Number(b.dataset.id), n = state.news.find(x => x.id === id);
+  if (b.dataset.news === "star" && n) n.important = !n.important;
+  else if (b.dataset.news === "del") state.news = state.news.filter(x => x.id !== id);
+  save(); render();
+});
+
+document.querySelectorAll("[data-ai]").forEach(btn => btn.addEventListener("click", () => askAI(btn.dataset.ai)));
+$("#aiAsk").addEventListener("click", () => askAI($("#aiQuestion").value.trim()));
+$("#aiQuestion").addEventListener("keydown", e => { if (e.key === "Enter") askAI($("#aiQuestion").value.trim()); });
+
+// Chatbot: uses workspace-aware local answers and the AI runtime if available.
+function addChatBubble(message, who) { const el=document.createElement('div'); el.className='bubble '+who; el.textContent=message; $('#chatLog').appendChild(el); $('#chatLog').scrollTop=$('#chatLog').scrollHeight; }
+async function sendChat(message) { const q=(message||'').trim(); if(!q) return; addChatBubble(q,'user'); $('#chatInput').value=''; const open=state.tasks.filter(t=>!t.done), overdue=open.filter(t=>t.due&&t.due<today()); const context=`User message: ${q}\nWorkspace tasks: ${state.tasks.map(t=>`${t.title} [${t.done?'done':'open'}, ${t.priority}, due ${t.due||'not set'}]`).join('; ')||'none'}\nNews items: ${state.news.length}; events: ${state.events.length}; social drafts: ${state.socialPosts.length}. Reply helpfully and concisely.`; const temp=document.createElement('div'); temp.className='bubble bot'; temp.textContent='Thinking…'; $('#chatLog').appendChild(temp); if(sampleFn){try{const r=await sampleFn(context,{onText:({text})=>temp.textContent=text,modelTier:'default'});if(r&&r.text)temp.textContent=r.text;}catch(e){temp.textContent=localInsight(q);}}else{temp.textContent=localInsight(q);}}
+$('#chatSend').addEventListener('click',()=>sendChat($('#chatInput').value)); $('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat($('#chatInput').value)}); document.querySelectorAll('[data-chat]').forEach(b=>b.addEventListener('click',()=>sendChat(b.dataset.chat)));
+// Social media planner
+function renderSocial(){const f=$('#socialFilter').value;const posts=(state.socialPosts||[]).filter(p=>f==='All'||p.status===f).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));$('#socialList').innerHTML=posts.map(p=>`<article class="social-post"><div class="row"><strong style="flex:1">${esc(p.title||'Untitled post')}</strong><span class="pill">${esc(p.status)}</span></div><div class="meta"><span>${esc(p.platform)}</span><span>${p.date?fmt(p.date):'No date'}</span></div><p>${esc(p.text)}</p><div class="row"><button type="button" class="secondary" data-social-copy="${p.id}">Copy</button><button type="button" class="danger" data-social-delete="${p.id}">Delete</button></div></article>`).join('');$('#socialEmpty').hidden=posts.length>0;}
+$('#socialSave').addEventListener('click',()=>{const text=$('#socialText').value.trim();if(!text){$('#socialMsg').textContent='Write some post content first.';return;}state.socialPosts.push({id:Date.now(),title:$('#socialTitle').value.trim()||'Social post',platform:$('#socialPlatform').value,status:$('#socialStatus').value,date:$('#socialDate').value,text});save();renderSocial();$('#socialMsg').textContent='Post saved in your content planner.';$('#socialTitle').value='';$('#socialText').value='';});
+$('#socialClear').addEventListener('click',()=>{$('#socialTitle').value='';$('#socialText').value='';$('#socialMsg').textContent='';});
+$('#socialGenerate').addEventListener('click',async()=>{const topic=$('#socialText').value.trim()||$('#socialTitle').value.trim();if(!topic){$('#socialMsg').textContent='Enter a topic or a rough draft first.';return;}$('#socialMsg').textContent='Improving your draft…';if(sampleFn){try{const r=await sampleFn(`Create an engaging ${$('#socialPlatform').value} post based on this topic/draft. Keep it clear and authentic. Provide only the post text:\n${topic}`,{onText:({text})=>$('#socialText').value=text,modelTier:'default'});if(r&&r.text)$('#socialText').value=r.text;$('#socialMsg').textContent='AI draft is ready. Review it before saving.';}catch(e){$('#socialMsg').textContent='AI service unavailable. You can still write and save your post manually.';}}else{$('#socialMsg').textContent='AI runtime is not connected in this standalone file. You can still write and save your post manually.';}});
+$('#socialFilter').addEventListener('change',renderSocial);$('#socialList').addEventListener('click',e=>{const c=e.target.closest('[data-social-copy]'),d=e.target.closest('[data-social-delete]');if(c){const p=state.socialPosts.find(x=>x.id==c.dataset.socialCopy);if(p)navigator.clipboard?.writeText(p.text).then(()=>$('#socialMsg').textContent='Post copied.').catch(()=>$('#socialMsg').textContent='Clipboard access is unavailable.');}if(d){state.socialPosts=state.socialPosts.filter(x=>x.id!=d.dataset.socialDelete);save();renderSocial();}});
+
+const blogSearch = document.getElementById('blogSearch');
+if (blogSearch) blogSearch.addEventListener('input', () => {
+  const q = blogSearch.value.trim().toLowerCase(); let visible = 0;
+  document.querySelectorAll('[data-blog-card]').forEach(card => { const show = card.dataset.search.includes(q); card.hidden = !show; if(show) visible++; });
+  document.getElementById('blogNoResults').hidden = visible > 0;
+});
+
+window.addEventListener("pagehide", () => { if (loaded) { try { localStorage.setItem("taskmgr", JSON.stringify(state)); } catch (e) {} } });
+render();
+renderSocial();
+load();
+</script>
+</body>
+</html>
